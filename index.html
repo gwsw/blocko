@@ -268,21 +268,19 @@ class Tile {
     }
     intersects(cells) {
         for (let i = 0; i < Tile.num_squares; ++i) {
-            const tx = this.xpos + this.cells[0][i];
-            const ty = this.ypos + this.cells[1][i];
-            if (tx < 0 || tx >= cells_width(cells)) return true;
-            if (ty < 0 || ty >= cells_height(cells)) return true;
-            if (cells[ty][tx] != null) return true;
+            const xpos = this.xpos + this.cells[0][i];
+            const ypos = this.ypos + this.cells[1][i];
+            if (xpos < 0 || xpos >= cells_width(cells)) return true;
+            if (ypos < 0 || ypos >= cells_height(cells)) return true;
+            if (cells[ypos][xpos] != null) return true;
         }
         return false;
     }
     splat(cells) {
         for (let i = 0; i < Tile.num_squares; ++i) {
-            const tx = this.xpos + this.cells[0][i];
-            const ty = this.ypos + this.cells[1][i];
-            ///if (tx < 1 || tx > 10) stop
-            ///if (ty < 1 || ty > 20) stop
-            cells[ty][tx] = this.color;
+            const xpos = this.xpos + this.cells[0][i];
+            const ypos = this.ypos + this.cells[1][i];
+            cells[ypos][xpos] = this.color;
         }
     }
     move(xincr, yincr) {
@@ -482,7 +480,7 @@ class Game {
         if (_game != null) _game.event_keystroke(e.key, false);
     }
     event_keystroke(key, down) {
-        if (down) return;
+        if (!down) return;
         switch (key) {
         case 'ArrowDown':
             if (this.playing) this.drop();
