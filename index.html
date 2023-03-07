@@ -314,10 +314,10 @@ class Game {
         this.last_step = 0;
         this.playing = true;
         this.game_over = false;
-        for (let y = 0; y < h; ++y) {
+        for (let ypos = 0; ypos < h; ++ypos) {
             this.cells.push([]);
-            for (let x = 0; x < w; ++x) {
-                this.cells[y].push(null);
+            for (let xpos = 0; xpos < w; ++xpos) {
+                this.cells[ypos].push(null);
             }
         }
     }
@@ -374,12 +374,12 @@ class Game {
 
         this.gfx.clear(config.canvas_bg);
         this.gfx.draw_outlined_rect(board_x, board_y, board_width, board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
-        for (let y = 0; y < this.height; ++y) {
-            for (let x = 0; x < this.width; ++x) {
-                let color = this.cells[y][x];
+        for (let ypos = 0; ypos < this.height; ++ypos) {
+            for (let xpos = 0; xpos < this.width; ++xpos) {
+                let color = this.cells[ypos][xpos];
                 if (color != null) {
                     if (!this.playing) color = color.darker(dark);
-                    Tile.draw_square(this.gfx, board_x + config.board_margin, board_y + config.board_margin, x, y, color);
+                    Tile.draw_square(this.gfx, board_x + config.board_margin, board_y + config.board_margin, xpos, ypos, color);
                 }
             }
         }
@@ -411,9 +411,9 @@ class Game {
             this.falling.move(-dir, 0);
     }
     clear_cells() {
-        for (let y = 0; y < this.height; ++y) {
-            for (let x = 0; x < this.width; ++x) {
-                this.cells[y][x] = null;
+        for (let ypos = 0; ypos < this.height; ++ypos) {
+            for (let xpos = 0; xpos < this.width; ++xpos) {
+                this.cells[ypos][xpos] = null;
             }
         }
     }
@@ -424,10 +424,10 @@ class Game {
             this.falling.rotate(-1);
     }
     set_full_row_color(full_row, color) {
-        for (let y = 0; y < this.height; ++y) {
-            if (full_row[y]) {
-                for (let x = 0; x < this.width; ++x) {
-                    this.cells[y][x] = color;
+        for (let ypos = 0; ypos < this.height; ++ypos) {
+            if (full_row[ypos]) {
+                for (let xpos = 0; xpos < this.width; ++xpos) {
+                    this.cells[ypos][xpos] = color;
                 }
             }
         }
@@ -438,15 +438,15 @@ class Game {
     check_full_rows(gfx) {
         let full_rows = 0;
         let full_row = [];
-        for (let y = 0; y < this.height; ++y) {
-            full_row.push(true); // full_row[y] = true;
-            for (let x = 0; x < this.width; ++x) {
-                if (this.cells[y][x] == null) {
-                    full_row[y] = false;
+        for (let ypos = 0; ypos < this.height; ++ypos) {
+            full_row.push(true); // full_row[ypos] = true;
+            for (let xpos = 0; xpos < this.width; ++xpos) {
+                if (this.cells[ypos][xpos] == null) {
+                    full_row[ypos] = false;
                     break;
                 }
             }
-            if (full_row[y]) ++full_rows;
+            if (full_row[ypos]) ++full_rows;
         }
         if (full_rows == 0) return;
         ++this.num_explosions;
@@ -456,14 +456,14 @@ class Game {
         let dst_y = this.height-1;
         for (let src_y = dst_y; src_y >= 0; --src_y) {
             if (!full_row[src_y]) {
-                for (let x = 0; x < this.width; ++x)
-                    this.cells[dst_y][x] = this.cells[src_y][x];
+                for (let xpos = 0; xpos < this.width; ++xpos)
+                    this.cells[dst_y][xpos] = this.cells[src_y][xpos];
                 --dst_y;
             }
         }
         while (dst_y > 0) {
-            for (let x = 0; x < this.width; ++x) {
-                this.cells[dst_y][x] = null;
+            for (let xpos = 0; xpos < this.width; ++xpos) {
+                this.cells[dst_y][xpos] = null;
             }
             --dst_y;
         }
