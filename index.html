@@ -22,6 +22,8 @@ var config = {
     color_score_margin     : "202000",
     color_score_bg         : "c0c040",
     color_score_fg         : "000000",
+    color_game_over_fg     : "ffffff",
+    color_game_over_fg2    : "000000",
     color_tile_I           : "866122",
     color_tile_L           : "F00034",
     color_tile_Q           : "34CB33",
@@ -98,10 +100,11 @@ class Graphics {
         }
         return { width: max_width, height: this.font_height * num_lines };
     }
-    draw_centered_text(x, y, w, text, color) {
+    draw_centered_text(x, y, w, text, color, color2 = null) {
         const text_size = this.measure_text(text);
         const nx = x + (w - text_size.width) / 2;
         if (nx > x) x = nx;
+        if (color2 != null) this.draw_text(x+2, y+2, text, color2);
         this.draw_text(x, y, text, color);
         return text_size;
     }
@@ -292,6 +295,7 @@ class Game {
         this.step_dur = 1000;
         this.last_step = 0;
         this.playing = true;
+        this.game_over = false;
         for (let y = 0; y < h; ++y) {
             this.cells.push([]);
             for (let x = 0; x < w; ++x) {
@@ -305,15 +309,15 @@ class Game {
         _tile_size  = h * .03;
     }
     run() {
-        if (!this.playing) return;
-        const time = now();
-        if (time >= this.last_step + this.step_dur) {
-            this.game_step(this.gfx);
-            this.last_step = time;
+        if (this.playing) {
+            const time = now();
+            if (time >= this.last_step + this.step_dur) {
+                this.game_step(this.gfx);
+                this.last_step = time;
+            }
         }
         this.draw(this.gfx);
         /// if (do_pause) DrawMessage("Paused"...)
-        // if board.game_over() return true
         ///if (this.explosions() != explosions) {
         ///    step_dur = (.9 * step_dur);
         ///    if (step_dur < 110) step_dur = 110;
@@ -323,8 +327,7 @@ class Game {
         if (this.falling == null) {
             this.falling = new Tile(5,1);
             if (this.falling.intersects(this.cells)) {
-                this.falling = null;
-                this.game_over();
+                this.games_over();
                 return false;
             }
         }
@@ -373,6 +376,9 @@ class Game {
         const score_text_width = this.gfx.measure_text(score_str).width;
         this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, 2, 2, config.color_score_bg, config.color_score_margin);
         this.gfx.draw_text(score_x + score_width - score_text_width - 8, score_y + 4, score_str, config.color_score_fg);
+
+        if (this.game_over)
+            this.gfx.draw_centered_text(board_x, board_y, board_width, "Game over", config.color_game_over_fg, config.color_game_over_fg2);
     }
     drop(gfx) {
         if (this.falling == null) return;
@@ -479,9 +485,10 @@ class Game {
             break;
         }
     }
-    game_over(msg) {
+    games_over() {
         ///this.message = "Game over: "+msg;
         ///this.draw();
+        this.game_over = true;
         this.playing = false;
     }
 }; // class Game
