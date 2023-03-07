@@ -268,8 +268,8 @@ class Tile {
     }
     draw(gfx, xoff, yoff) {
         for (let i = 0; i < Tile.num_squares; ++i) {
-            const x = xoff + (((this.xpos-1) + this.cells[0][i]) * this.width);
-            const y = yoff + (((this.ypos-1) + this.cells[1][i]) * this.height);
+            const x = xoff + ((this.xpos + this.cells[0][i]) * this.width);
+            const y = yoff + ((this.ypos + this.cells[1][i]) * this.height);
             gfx.draw_rect(x, y, this.width-1, this.height-1, this.color);
         }
     }
@@ -298,8 +298,8 @@ class Tile {
     }
     rotate(dir) {
         for (let i = 0; i < Tile.num_squares; ++i) {
-            const t = m.cells[0][i];
-            this.cells[0][i] = m.cells[1][i] * dir;
+            const t = this.cells[0][i];
+            this.cells[0][i] = this.cells[1][i] * dir;
             this.cells[1][i] = -t * dir;
         }
     }
@@ -343,7 +343,7 @@ class Game {
         this.draw(this.gfx);
         /// if (do_pause) DrawMessage("Paused"...)
         // if board.game_over() return true
-        ///if (this.exposions() != explosions) {
+        ///if (this.explosions() != explosions) {
         ///    step_dur = (.9 * step_dur);
         ///    if (step_dur < 110) step_dur = 110;
         ///}
@@ -487,22 +487,20 @@ class Game {
         if (_game != null) _game.event_keystroke(e.key, false);
     }
     event_keystroke(key, down) {
+        if (down) return;
         switch (key) {
         case 'ArrowDown':
-            this.game.drop();
-            draw = true;
+            this.drop();
             break;
         case 'ArrowRight':
-            this.game.move_horz(+1);
-            draw = true;
+            this.move_horz(+1);
             break;
         case 'ArrowLeft':
-            this.game.move_horz(-1);
-            draw = true;
+            this.move_horz(-1);
             break;
-        case '\n': case '\r':
-            this.game.rotate_falling();
-            draw = true;
+        case 'Enter':
+        case ' ':
+            this.rotate_falling();
             break;
         case 'ArrowUp':
             this.playing = !this.playing;
