@@ -12,13 +12,11 @@
 // Globals
 var _game = null;
 
-const UP_ARROW    = "\u25b2";
-const DOWN_ARROW  = "\u25bc";
-const RIGHT_ARROW = "\u25b6";
-const LEFT_ARROW  = "\u25c0";
-
 var config = {
     button_border          : 3,
+    color_canvas_bg        : "00e0e0",
+    color_board_bg         : "101830",
+    color_board_bg_border  : "305080",
     color_score_border     : "ff3010",
     color_score_bg         : "ff3010",
     color_score_fg         : "000000",
@@ -178,6 +176,7 @@ class Graphics {
 
 // --------------------------------------------------------------------
 class Tile {
+    static num_squares = 4;
     constructor(xpos, ypos) {
         const cells = [];
         for (let y = 0; y < 2; ++y) {
@@ -262,22 +261,47 @@ class Tile {
             ///print "invalid tile type ";tile_type; stop
         }
         this.cells = cells;
-        tile.xpos = xpos;
-        tile.ypos = ypos;
-        tile.width = Tile.size();
-        tile.height = Tile.size();
+        this.xpos = xpos;
+        this.ypos = ypos;
+        this.width = Tile.size();
+        this.height = Tile.size();
     }
     draw(gfx, xoff, yoff) {
+        for (let i = 0; i < Tile.num_squares; ++i) {
+            const x = xoff + (((this.xpos-1) + this.cells[0][i]) * this.width);
+            const y = yoff + (((this.ypos-1) + this.cells[1][i]) * this.height);
+            gfx.draw_rect(x, y, this.width-1, this.height-1, this.color);
+        }
     }
     intersects(cells) {
+        for (let i = 0; i < Tile.num_squares; ++i) {
+            const tx = this.xpos + this.cells[0][i];
+            const ty = this.ypos + this.cells[1][i];
+            if (tx < 0 || tx >= cells_width(cells)) return true;
+            if (ty < 0 || ty >= cells_height(cells)) return true;
+            if (cells[ty][tx] != null) return true;
+        }
+        return false;
     }
     splat(cells) {
+        for (let i = 0; i < Tile.num_squares; ++i) {
+            const tx = this.xpos + this.cells[0][i];
+            const ty = this.ypos + this.cells[1][i];
+            ///if (tx < 1 || tx > 10) stop
+            ///if (ty < 1 || ty > 20) stop
+            cells[ty][tx] = this.color;
+        }
     }
     move(xincr, yincr) {
         this.xpos += xincr;
         this.ypos += yincr;
     }
     rotate(dir) {
+        for (let i = 0; i < Tile.num_squares; ++i) {
+            const t = m.cells[0][i];
+            this.cells[0][i] = m.cells[1][i] * dir;
+            this.cells[1][i] = -t * dir;
+        }
     }
     static size() {
 return 16; ///
@@ -299,8 +323,8 @@ class Game {
         this.width = w;
         this.height = h;
         this.cells = [];
-        this.step_time = 1000;
-        this.clock_mark = 0;
+        this.step_dur = 1000;
+        this.last_step = 0;
         this.playing = true;
         for (let y = 0; y < h; ++y) {
             this.cells.push([]);
@@ -311,17 +335,17 @@ class Game {
     }
     run() {
         if (!this.playing) return;
-        const time = now() - this.clock_mark;
-        if (time >= this.step_time) {
+        const time = now();
+        if (time >= this.last_step + this.step_dur) {
             this.game_step(this.gfx);
-            this.clock_mark = time;
+            this.last_step = time;
         }
         this.draw(this.gfx);
         /// if (do_pause) DrawMessage("Paused"...)
         // if board.game_over() return true
         ///if (this.exposions() != explosions) {
-        ///    step_time = (.9 * step_time);
-        ///    if (step_time < 110) step_time = 110;
+        ///    step_dur = (.9 * step_dur);
+        ///    if (step_dur < 110) step_dur = 110;
         ///}
     }
     game_step(gfx) {
@@ -331,8 +355,7 @@ class Game {
                 this.falling = null;
                 // game_over
                 this.game_over_ = true;
-                return false;
-            }
+                return false; }
         }
         this.falling.move(0,1);
         if (this.falling.intersects(this.cells)) {
@@ -359,6 +382,8 @@ class Game {
         const score_y = 40;
         const score_height = board_y - score_y - 6;
 
+        this.gfx.clear(config.canvas_bg);
+        this.gfx.draw_outlined_rect(board_x, board_y, board_width, board_height, 2, 2, config.color_board_bg, config.color_board_bg_border);
         for (let y = 0; y < this.height; ++y) {
             for (let x = 0; x < this.width; ++x) {
                 const color = this.cells[y][x];
@@ -417,7 +442,7 @@ class Game {
         let full_row = [];
         for (let y = 0; y < this.height; ++y) {
             full_row.push(true); // full_row[y] = true;
-            for (let x = 0; x < m.width; ++x) {
+            for (let x = 0; x < this.width; ++x) {
                 if (this.cells[y][x] == null) {
                     full_row[y] = false;
                     break;
@@ -434,7 +459,7 @@ class Game {
         let src_y = this.height;
         while (src_y > 0) {
             if (!full_row[src_y]) {
-                for (let x = 0; x < m.width; ++x) {
+                for (let x = 0; x < this.width; ++x) {
                     this.cells[dst_y][x] = this.cells[src_y][x];
                 }
                 --dst_y;
@@ -442,7 +467,7 @@ class Game {
             --src_y;
         }
         while (dst_y > 0) {
-            for (let x = 0; x < m.width; ++x) {
+            for (let x = 0; x < this.width; ++x) {
                 this.cells[dst_y][x] = 0;
             }
             --dst_y;
@@ -492,6 +517,13 @@ class Game {
 }; // class Game
 
 // --------------------------------------------------------------------
+
+function cells_height(cells) {
+    return cells.length;
+}
+function cells_width(cells) {
+    return cells[0].length;
+}
 
 function now() {
     return performance.now();
