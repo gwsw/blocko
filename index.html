@@ -11,14 +11,16 @@
 // --------------------------------------------------------------------
 // Globals
 var _game = null;
+var _tile_size;
 
 var config = {
-    button_border          : 3,
+    cell_margin            : 2,
+    board_margin           : 4,
     color_canvas_bg        : "00e0e0",
     color_board_bg         : "101830",
-    color_board_bg_border  : "305080",
-    color_score_border     : "ff3010",
-    color_score_bg         : "ff3010",
+    color_board_bg_margin  : "305080",
+    color_score_margin     : "202000",
+    color_score_bg         : "c0c040",
     color_score_fg         : "000000",
     color_tile_I           : "866122",
     color_tile_L           : "F00034",
@@ -188,74 +190,46 @@ class Tile {
         const tile_type = Math.floor((Math.random() * 16777216) / 256) % num_tile_types;
 
         if (tile_type == 0) { // T
-            cells[0][0] = 0;
-            cells[1][0] = 0;
-            cells[0][1] = 1;
-            cells[1][1] = 0;
-            cells[0][2] = -1;
-            cells[1][2] = 0;
-            cells[0][3] = 0;
-            cells[1][3] = 1;
+            cells[0][0] = 0;  cells[1][0] = 0;
+            cells[0][1] = 1;  cells[1][1] = 0;
+            cells[0][2] = -1; cells[1][2] = 0;
+            cells[0][3] = 0;  cells[1][3] = 1;
             this.color = config.color_tile_T;
-        } else if (tile_type == 1) { // straight
-            cells[0][0] = -1;
-            cells[1][0] = 0;
-            cells[0][1] = 0;
-            cells[1][1] = 0;
-            cells[0][2] = 1;
-            cells[1][2] = 0;
-            cells[0][3] = 2;
-            cells[1][3] = 0;
+        } else if (tile_type == 1) { // I
+            cells[0][0] = -1; cells[1][0] = 0;
+            cells[0][1] = 0;  cells[1][1] = 0;
+            cells[0][2] = 1;  cells[1][2] = 0;
+            cells[0][3] = 2;  cells[1][3] = 0;
             this.color = config.color_tile_I;
-        } else if (tile_type == 2) { // fwd L
-            cells[0][0] = -1;
-            cells[1][0] = 0;
-            cells[0][1] = 0;
-            cells[1][1] = 0;
-            cells[0][2] = 1;
-            cells[1][2] = 0;
-            cells[0][3] = -1;
-            cells[1][3] = 1;
+        } else if (tile_type == 2) { // L
+            cells[0][0] = -1; cells[1][0] = 0;
+            cells[0][1] = 0;  cells[1][1] = 0;
+            cells[0][2] = 1;  cells[1][2] = 0;
+            cells[0][3] = -1; cells[1][3] = 1;
             this.color = config.color_tile_L;
-        } else if (tile_type == 3) { // rev L
-            cells[0][0] = -1;
-            cells[1][0] = 0;
-            cells[0][1] = 0;
-            cells[1][1] = 0;
-            cells[0][2] = 1;
-            cells[1][2] = 0;
-            cells[0][3] = 1;
-            cells[1][3] = 1;
+        } else if (tile_type == 3) { // R
+            cells[0][0] = -1; cells[1][0] = 0;
+            cells[0][1] = 0;  cells[1][1] = 0;
+            cells[0][2] = 1;  cells[1][2] = 0;
+            cells[0][3] = 1;  cells[1][3] = 1;
             this.color = config.color_tile_R;
-        } else if (tile_type == 4) { // square
-            cells[0][0] = 0;
-            cells[1][0] = 0;
-            cells[0][1] = 0;
-            cells[1][1] = 1;
-            cells[0][2] = 1;
-            cells[1][2] = 0;
-            cells[0][3] = 1;
-            cells[1][3] = 1;
+        } else if (tile_type == 4) { // Q
+            cells[0][0] = 0;  cells[1][0] = 0;
+            cells[0][1] = 0;  cells[1][1] = 1;
+            cells[0][2] = 1;  cells[1][2] = 0;
+            cells[0][3] = 1;  cells[1][3] = 1;
             this.color = config.color_tile_Q;
         } else if (tile_type == 5) { // Z
-            cells[0][0] = 0;
-            cells[1][0] = 0;
-            cells[0][1] = 1;
-            cells[1][1] = 0;
-            cells[0][2] = 0;
-            cells[1][2] = 1;
-            cells[0][3] = -1;
-            cells[1][3] = 1;
+            cells[0][0] = 0;  cells[1][0] = 0;
+            cells[0][1] = 1;  cells[1][1] = 0;
+            cells[0][2] = 0;  cells[1][2] = 1;
+            cells[0][3] = -1; cells[1][3] = 1;
             this.color = config.color_tile_Z;
         } else if (tile_type == 6) { // S
-            cells[0][0] = 0;
-            cells[1][0] = 0;
-            cells[0][1] = -1;
-            cells[1][1] = 0;
-            cells[0][2] = 0;
-            cells[1][2] = 1;
-            cells[0][3] = 1;
-            cells[1][3] = 1;
+            cells[0][0] = 0;  cells[1][0] = 0;
+            cells[0][1] = -1; cells[1][1] = 0;
+            cells[0][2] = 0;  cells[1][2] = 1;
+            cells[0][3] = 1;  cells[1][3] = 1;
             this.color = config.color_tile_S;
         } else {
             ///print "invalid tile type ";tile_type; stop
@@ -263,14 +237,12 @@ class Tile {
         this.cells = cells;
         this.xpos = xpos;
         this.ypos = ypos;
-        this.width = Tile.size();
-        this.height = Tile.size();
     }
     draw(gfx, xoff, yoff) {
         for (let i = 0; i < Tile.num_squares; ++i) {
-            const x = xoff + ((this.xpos + this.cells[0][i]) * this.width);
-            const y = yoff + ((this.ypos + this.cells[1][i]) * this.height);
-            gfx.draw_rect(x, y, this.width-1, this.height-1, this.color);
+            const x = xoff + ((this.xpos + this.cells[0][i]) * _tile_size);
+            const y = yoff + ((this.ypos + this.cells[1][i]) * _tile_size);
+            gfx.draw_rect(x, y, _tile_size-1, _tile_size-1, this.color);
         }
     }
     intersects(cells) {
@@ -303,9 +275,6 @@ class Tile {
             this.cells[1][i] = -t * dir;
         }
     }
-    static size() {
-return 16; ///
-    }
 }; // class Tile
 
 // --------------------------------------------------------------------
@@ -313,9 +282,7 @@ class Game {
     constructor(gfx, w, h) {
         this.gfx = gfx;
         const canvas = gfx.ctx.canvas;
-        this.cw = canvas.width;
-        this.ch = canvas.height;
-
+        this.canvas_size(canvas.width, canvas.height);
         this.num_explosions = 0;
         this.score_ = 0;
         this.falling = null;
@@ -331,6 +298,11 @@ class Game {
                 this.cells[y].push(null);
             }
         }
+    }
+    canvas_size(w, h) {
+        this.cw = w;
+        this.ch = h;
+        _tile_size  = h * .03;
     }
     run() {
         if (!this.playing) return;
@@ -368,21 +340,21 @@ class Game {
         return true;
     }
     draw(dur) {
-        const cell_width = Tile.size();
-        const cell_height = Tile.size();
-        const cell_margin = 2;
+        const cell_width = _tile_size;
+        const cell_height = _tile_size;
+        const cell_margin = config.cell_margin;
         const screen_width = this.cw;
         const board_width = (cell_width * this.width) + (2*cell_margin);
         const board_height = (cell_height * this.height) + (2*cell_margin);
-        const board_x = (screen_width - board_width) / 2;
-        const board_y = 92; /// FIXME
-        const score_width = board_width - 18;
-        const score_x = (screen_width - score_width) / 2;
+        const score_width = board_width * .75;
+        const score_height = board_height * .15;
         const score_y = 40;
-        const score_height = board_y - score_y - 6;
+        const board_y = score_y + score_height + 8;
+        const board_x = (screen_width - board_width) / 2;
+        const score_x = (screen_width - score_width) / 2;
 
         this.gfx.clear(config.canvas_bg);
-        this.gfx.draw_outlined_rect(board_x, board_y, board_width, board_height, 2, 2, config.color_board_bg, config.color_board_bg_border);
+        this.gfx.draw_outlined_rect(board_x-config.board_margin, board_y-config.board_margin, board_width+2*config.board_margin, board_height+2*config.board_margin, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let y = 0; y < this.height; ++y) {
             for (let x = 0; x < this.width; ++x) {
                 const color = this.cells[y][x];
@@ -399,7 +371,7 @@ class Game {
 
         const score_str = this.score_.toString();
         const score_text_width = this.gfx.measure_text(score_str).width;
-        this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, 2, 2, config.color_score_bg, config.color_score_border);
+        this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, 2, 2, config.color_score_bg, config.color_score_margin);
         this.gfx.draw_text(score_x + score_width - score_text_width - 8, score_y + 4, score_str, config.color_score_fg);
     }
     drop(gfx) {
@@ -562,6 +534,7 @@ function canvas_size(name, w, h) {
     const canvas = el(name);
     canvas.width = w;
     canvas.height = h;
+    if (_game != null) _game.canvas_size(w, h);
     return canvas;
 }
 
