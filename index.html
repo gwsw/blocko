@@ -11,14 +11,15 @@
 // --------------------------------------------------------------------
 // Globals
 var _game = null;
-var _tile_size;
+var _square_size;
 
 var config = {
     cell_margin            : 2,
-    board_margin           : 4,
+    score_margin           : 2,
+    board_margin           : 8,
     color_canvas_bg        : "00e0e0",
     color_board_bg         : "101830",
-    color_board_bg_margin  : "305080",
+    color_board_bg_margin  : "808080",
     color_score_margin     : "202000",
     color_score_bg         : "c0c040",
     color_score_fg         : "000000",
@@ -44,6 +45,12 @@ class Color {
     jstring() {
         return "#" + this.hex_str;
     }
+    get_comp(comp) {
+        return parseInt(this.hex_str.substr(comp*2, 2), 16);
+    }
+    darker(mult) {
+        return new Color(hex2(this.get_comp(0)*mult) + hex2(this.get_comp(1)*mult) + hex2(this.get_comp(2)*mult));
+    }
 };
 
 // --------------------------------------------------------------------
@@ -61,7 +68,8 @@ class Graphics {
         this.draw_rect(0, 0, w, h, color);
     }
     draw_rect(x, y, w, h, color) {
-        if (color != undefined && color != null) this.ctx.fillStyle = color.jstring();
+        if (color != undefined && color != null)
+            this.ctx.fillStyle = color.jstring();
         this.ctx.fillRect(x, y, w, h);
     }
     draw_centered_rect(cx, cy, w, h, color) {
@@ -100,11 +108,18 @@ class Graphics {
         }
         return { width: max_width, height: this.font_height * num_lines };
     }
-    draw_centered_text(x, y, w, text, color, color2 = null) {
+    // just < 0 => left justify
+    // just > 0 => right justify
+    // just == 0 => centered
+    draw_just_text(x, y, w, text, just, color, color_shadow = null) {
         const text_size = this.measure_text(text);
-        const nx = x + (w - text_size.width) / 2;
+        let nx = x;
+        if (just == 0)
+            nx = x + (w - text_size.width) / 2;
+        else if (just > 0)
+            nx = x + w - text_size.width;
         if (nx > x) x = nx;
-        if (color2 != null) this.draw_text(x+2, y+2, text, color2);
+        if (color_shadow != null) this.draw_text(x+2, y+2, text, color_shadow);
         this.draw_text(x, y, text, color);
         return text_size;
     }
@@ -241,12 +256,15 @@ class Tile {
         this.xpos = xpos;
         this.ypos = ypos;
     }
-    draw(gfx, xoff, yoff) {
-        for (let i = 0; i < Tile.num_squares; ++i) {
-            const x = xoff + ((this.xpos + this.cells[0][i]) * _tile_size);
-            const y = yoff + ((this.ypos + this.cells[1][i]) * _tile_size);
-            gfx.draw_rect(x, y, _tile_size-1, _tile_size-1, this.color);
-        }
+    draw(gfx, xoff, yoff, dark = 1) {
+        let color = this.color.darker(dark);
+        for (let i = 0; i < Tile.num_squares; ++i)
+            Tile.draw_square(gfx, xoff, yoff, this.xpos + this.cells[0][i], this.ypos + this.cells[1][i], color);
+    }
+    static draw_square(gfx, xoff, yoff, xpos, ypos, color) {
+        const x = xoff + (xpos * _square_size);
+        const y = yoff + (ypos * _square_size);
+        gfx.draw_rect(x, y, _square_size-1, _square_size-1, color);
     }
     intersects(cells) {
         for (let i = 0; i < Tile.num_squares; ++i) {
@@ -306,9 +324,10 @@ class Game {
     canvas_size(w, h) {
         this.cw = w;
         this.ch = h;
-        _tile_size  = h * .03;
+        _square_size  = h * .03;
     }
     run() {
+        const old_explosions = this.explosions();
         if (this.playing) {
             const time = now();
             if (time >= this.last_step + this.step_dur) {
@@ -317,15 +336,14 @@ class Game {
             }
         }
         this.draw(this.gfx);
-        /// if (do_pause) DrawMessage("Paused"...)
-        ///if (this.explosions() != explosions) {
-        ///    step_dur = (.9 * step_dur);
-        ///    if (step_dur < 110) step_dur = 110;
-        ///}
+        if (this.explosions() > old_explosions) {
+            step_dur = (.9 * step_dur);
+            if (step_dur < 110) step_dur = 110;
+        }
     }
     game_step(gfx) {
         if (this.falling == null) {
-            this.falling = new Tile(5,1);
+            this.falling = new Tile(this.width/2, 1);
             if (this.falling.intersects(this.cells)) {
                 this.games_over();
                 return false;
@@ -343,42 +361,41 @@ class Game {
         return true;
     }
     draw(dur) {
-        const cell_width = _tile_size;
-        const cell_height = _tile_size;
         const cell_margin = config.cell_margin;
-        const screen_width = this.cw;
-        const board_width = (cell_width * this.width) + (2*cell_margin);
-        const board_height = (cell_height * this.height) + (2*cell_margin);
+        const board_width = (_square_size * this.width) + (2*config.board_margin);
+        const board_height = (_square_size * this.height) + (2*config.board_margin);
         const score_width = board_width * .75;
-        const score_height = board_height * .15;
-        const score_y = 40;
-        const board_y = score_y + score_height + 8;
-        const board_x = (screen_width - board_width) / 2;
-        const score_x = (screen_width - score_width) / 2;
+        const score_height = board_height * .12;
+        const score_y = score_height * .75;
+        const board_y = score_y + score_height*(1.2);
+        const score_x = (this.cw - score_width) / 2;
+        const board_x = (this.cw - board_width) / 2;
+        const dark = 0.45;
 
         this.gfx.clear(config.canvas_bg);
-        this.gfx.draw_outlined_rect(board_x-config.board_margin, board_y-config.board_margin, board_width+2*config.board_margin, board_height+2*config.board_margin, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
+        this.gfx.draw_outlined_rect(board_x, board_y, board_width, board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let y = 0; y < this.height; ++y) {
             for (let x = 0; x < this.width; ++x) {
-                const color = this.cells[y][x];
+                let color = this.cells[y][x];
                 if (color != null) {
-                    const xp = board_x + cell_margin + (x * cell_width);
-                    const yp = board_y + cell_margin + (y * cell_height);
-                    this.gfx.draw_rect(xp, yp, cell_width-1, cell_height-1, color);
+                    if (!this.playing) color = color.darker(dark);
+                    Tile.draw_square(this.gfx, board_x + config.board_margin, board_y + config.board_margin, x, y, color);
                 }
             }
         }
 
         if (this.falling != null)
-            this.falling.draw(this.gfx, board_x + cell_margin, board_y + cell_margin);
+            this.falling.draw(this.gfx, board_x + config.board_margin, board_y + config.board_margin, this.playing?1:dark);
 
         const score_str = this.score_.toString();
-        const score_text_width = this.gfx.measure_text(score_str).width;
-        this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, 2, 2, config.color_score_bg, config.color_score_margin);
-        this.gfx.draw_text(score_x + score_width - score_text_width - 8, score_y + 4, score_str, config.color_score_fg);
+        this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, config.score_margin, config.score_margin, config.color_score_bg, config.color_score_margin);
+        this.gfx.draw_just_text(score_x + config.score_margin, score_y + config.score_margin, score_width*0.9, score_str, +1, config.color_score_fg);
 
+        const msg_y = board_y + config.board_margin*2;
         if (this.game_over)
-            this.gfx.draw_centered_text(board_x, board_y, board_width, "Game over", config.color_game_over_fg, config.color_game_over_fg2);
+            this.gfx.draw_just_text(board_x, msg_y, board_width, "Game over", 0, config.color_game_over_fg, config.color_game_over_fg2);
+        else if (!this.playing)
+            this.gfx.draw_just_text(board_x, msg_y, board_width, "PAUSED", 0, config.color_game_over_fg, config.color_game_over_fg2);
     }
     drop(gfx) {
         if (this.falling == null) return;
@@ -446,7 +463,7 @@ class Game {
         }
         while (dst_y > 0) {
             for (let x = 0; x < this.width; ++x) {
-                this.cells[dst_y][x] = 0;
+                this.cells[dst_y][x] = null;
             }
             --dst_y;
         }
@@ -468,17 +485,16 @@ class Game {
         if (down) return;
         switch (key) {
         case 'ArrowDown':
-            this.drop();
+            if (this.playing) this.drop();
             break;
         case 'ArrowRight':
-            this.move_horz(+1);
+            if (this.playing) this.move_horz(+1);
             break;
         case 'ArrowLeft':
-            this.move_horz(-1);
+            if (this.playing) this.move_horz(-1);
             break;
-        case 'Enter':
-        case ' ':
-            this.rotate_falling();
+        case ' ': case 'Enter':
+            if (this.playing) this.rotate_falling();
             break;
         case 'ArrowUp':
             this.playing = !this.playing;
@@ -486,8 +502,6 @@ class Game {
         }
     }
     games_over() {
-        ///this.message = "Game over: "+msg;
-        ///this.draw();
         this.game_over = true;
         this.playing = false;
     }
@@ -532,6 +546,11 @@ function munge_config() {
 function el(name) {
     return document.getElementById(name);
 }
+
+function padnum(num, len, radix) {
+    return Math.floor(num).toString(radix).padStart(len,"0");
+}
+function hex2(num) { return padnum(num, 2, 16); }
 
 function randu(n) {
     return Math.floor(Math.random() * n);
