@@ -197,14 +197,17 @@ class Game {
         const canvas = gfx.ctx.canvas;
         this.cw = canvas.width;
         this.ch = canvas.height;
+
+        this.num_explosions = 0;
+        this.score_ = 0;
+        this.game_over_ = false;
+        this.falling = null;
         this.width = w;
         this.height = h;
+        this.cells = [];
+        this.step_time = 1000;
         this.clock_mark = 0;
         this.playing = true;
-        this.cells = [];
-        this.speed = 10; ////FIXME
-        this.step_time = 1000;
-        this.score_ = 0;
         for (let y = 0; y < h; ++y) {
             this.cells.push([]);
             for (let x = 0; x < w; ++x) {
@@ -222,10 +225,10 @@ class Game {
         this.draw(this.gfx);
         /// if (do_pause) DrawMessage("Paused"...)
         // if board.game_over() return true
-        if (board.exposions() != explosions) {
-            step_time = (.9 * step_time);
-            if (step_time < 110) step_time = 110;
-        }
+        ///if (this.exposions() != explosions) {
+        ///    step_time = (.9 * step_time);
+        ///    if (step_time < 110) step_time = 110;
+        ///}
     }
     draw(dur) {
         const cell_width = Tile.size();
@@ -258,7 +261,7 @@ class Game {
         const score_str = this.score_.toString();
         const score_text_width = 33;;////FIXME GetFont(1).GetOneLineWidth(score_str, board_width);
         this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, 2, 2, config.color_score_bg, config.color_score_border);
-        this.gfx.draw_text(score_x + score_width - score_text_width - 8, score_y + 4, score_str, config.color_score_text);
+        this.gfx.draw_text(score_x + score_width - score_text_width - 8, score_y + 4, score_str, config.color_score_fg);
     }
     drop() {
 ///LATER
@@ -283,11 +286,53 @@ class Game {
             this.falling.rotate(-1);
     }
     set_full_row_color(full_row, color) {
+        for (let y = 0; y < this.height; ++y) {
+            if (full_row[y]) {
+                for (let x = 0; x < this.width; ++x) {
+                    this.cells[y][x] = color;
+                }
+            }
+        }
     }
     explosions() {
         return this.num_explosions;
     }
     check_full_rows(gfx) {
+        let full_rows = 0;
+        let full_row = [];
+        for (let y = 0; y < this.height; ++y) {
+            full_row.push(true); // full_row[y] = true;
+            for (let x = 0; x < m.width; ++x) {
+                if (this.cells[y][x] == null) {
+                    full_row[y] = false;
+                    break;
+                }
+            }
+            if (full_row[y]) ++full_rows;
+        }
+        if (full_rows == 0) return;
+        ++this.num_explosions;
+
+        /// ***** sound effects
+
+        let dst_y = this.height;
+        let src_y = this.height;
+        while (src_y > 0) {
+            if (!full_row[src_y]) {
+                for (let x = 0; x < m.width; ++x) {
+                    this.cells[dst_y][x] = this.cells[src_y][x];
+                }
+                --dst_y;
+            }
+            --src_y;
+        }
+        while (dst_y > 0) {
+            for (let x = 0; x < m.width; ++x) {
+                this.cells[dst_y][x] = 0;
+            }
+            --dst_y;
+        }
+        this.add_score(100 * full_rows * full_rows);
     }
     score() {
         return this.score_;
