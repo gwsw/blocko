@@ -318,7 +318,6 @@ class Game {
 
         this.num_explosions = 0;
         this.score_ = 0;
-        this.game_over_ = false;
         this.falling = null;
         this.width = w;
         this.height = h;
@@ -353,9 +352,9 @@ class Game {
             this.falling = new Tile(5,1);
             if (this.falling.intersects(this.cells)) {
                 this.falling = null;
-                // game_over
-                this.game_over_ = true;
-                return false; }
+                this.game_over();
+                return false;
+            }
         }
         this.falling.move(0,1);
         if (this.falling.intersects(this.cells)) {
@@ -388,8 +387,8 @@ class Game {
             for (let x = 0; x < this.width; ++x) {
                 const color = this.cells[y][x];
                 if (color != null) {
-                    const xp = board_x + cell_margin + ((x-1) * cell_width);
-                    const yp = board_y + cell_margin + ((y-1) * cell_height);
+                    const xp = board_x + cell_margin + (x * cell_width);
+                    const yp = board_y + cell_margin + (y * cell_height);
                     this.gfx.draw_rect(xp, yp, cell_width-1, cell_height-1, color);
                 }
             }
@@ -399,12 +398,16 @@ class Game {
             this.falling.draw(this.gfx, board_x + cell_margin, board_y + cell_margin);
 
         const score_str = this.score_.toString();
-        const score_text_width = 33;;////FIXME GetFont(1).GetOneLineWidth(score_str, board_width);
+        const score_text_width = this.gfx.measure_text(score_str).width;
         this.gfx.draw_outlined_rect(score_x, score_y, score_width, score_height, 2, 2, config.color_score_bg, config.color_score_border);
         this.gfx.draw_text(score_x + score_width - score_text_width - 8, score_y + 4, score_str, config.color_score_fg);
     }
-    drop() {
-///LATER
+    drop(gfx) {
+        if (this.falling == null) return;
+        while (this.game_step(gfx)) {
+            continue;
+        }
+        this.add_score(25);
     }
     move_horz(dir) {
         if (this.falling == null) return;
@@ -455,16 +458,13 @@ class Game {
 
         /// ***** sound effects
 
-        let dst_y = this.height;
-        let src_y = this.height;
-        while (src_y > 0) {
+        let dst_y = this.height-1;
+        for (let src_y = dst_y; src_y >= 0; --src_y) {
             if (!full_row[src_y]) {
-                for (let x = 0; x < this.width; ++x) {
+                for (let x = 0; x < this.width; ++x)
                     this.cells[dst_y][x] = this.cells[src_y][x];
-                }
                 --dst_y;
             }
-            --src_y;
         }
         while (dst_y > 0) {
             for (let x = 0; x < this.width; ++x) {
@@ -509,7 +509,7 @@ class Game {
     }
     game_over(msg) {
         ///this.message = "Game over: "+msg;
-        this.draw();
+        ///this.draw();
         this.playing = false;
     }
 }; // class Game
@@ -573,7 +573,7 @@ function canvas_resize() {
 function main() {
     munge_config();
     const canvas = canvas_resize();
-    const gfx = new Graphics(canvas.getContext("2d"), canvas.height*.028);
+    const gfx = new Graphics(canvas.getContext("2d"), canvas.height*.040);
     _game = new Game(gfx, 10, 20);
     document.addEventListener('keyup', Game._event_keyup);
     document.addEventListener('keydown', Game._event_keydown);
