@@ -266,23 +266,6 @@ class Tile {
         const y = yoff + (ypos * _square_size);
         gfx.draw_rect(x, y, _square_size-1, _square_size-1, color);
     }
-    intersects(cells) {
-        for (let i = 0; i < Tile.num_squares; ++i) {
-            const xpos = this.xpos + this.cells[0][i];
-            const ypos = this.ypos + this.cells[1][i];
-            if (xpos < 0 || xpos >= cells_width(cells)) return true;
-            if (ypos < 0 || ypos >= cells_height(cells)) return true;
-            if (cells[ypos][xpos] != null) return true;
-        }
-        return false;
-    }
-    splat(cells) {
-        for (let i = 0; i < Tile.num_squares; ++i) {
-            const xpos = this.xpos + this.cells[0][i];
-            const ypos = this.ypos + this.cells[1][i];
-            cells[ypos][xpos] = this.color;
-        }
-    }
     move(xincr, yincr) {
         this.xpos += xincr;
         this.ypos += yincr;
@@ -318,9 +301,9 @@ class Board {
     }
     fall_step(falling) {
         falling.move(0,1);
-        if (falling.intersects(this.cells)) {
+        if (this.intersects(falling)) {
             falling.move(0,-1);
-            falling.splat(this.cells);
+            this.splat(falling);
             return false;
         }
         return true;
@@ -380,6 +363,23 @@ class Board {
         }
         return full_rows;
     }
+    intersects(tile) {
+        for (let i = 0; i < Tile.num_squares; ++i) {
+            const xpos = tile.xpos + tile.cells[0][i];
+            const ypos = tile.ypos + tile.cells[1][i];
+            if (xpos < 0 || xpos >= this.width) return true;
+            if (ypos < 0 || ypos >= this.height) return true;
+            if (this.cells[ypos][xpos] != null) return true;
+        }
+        return false;
+    }
+    splat(tile) {
+        for (let i = 0; i < Tile.num_squares; ++i) {
+            const xpos = tile.xpos + tile.cells[0][i];
+            const ypos = tile.ypos + tile.cells[1][i];
+            this.cells[ypos][xpos] = tile.color;
+        }
+    }
 }; // class Board
 
 // --------------------------------------------------------------------
@@ -420,7 +420,7 @@ class Game {
     game_step() {
         if (this.falling == null) {
             this.falling = new Tile(this.board.width/2, 1);
-            if (this.falling.intersects(this.board.cells))
+            if (this.board.intersects(this.falling))
                 this.game_is_over();
         } else if (!this.board.fall_step(this.falling)) {
             this.falling = null;
@@ -454,13 +454,13 @@ class Game {
     move_horz(dir) {
         if (this.falling == null) return;
         this.falling.move(dir,0);
-        if (this.falling.intersects(this.board.cells))
+        if (this.board.intersects(this.falling))
             this.falling.move(-dir, 0);
     }
     rotate_falling() {
         if (this.falling == null) return;
         this.falling.rotate(1);
-        if (this.falling.intersects(this.board.cells))
+        if (this.board.intersects(this.falling))
             this.falling.rotate(-1);
     }
     explosions() {
