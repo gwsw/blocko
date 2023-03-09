@@ -14,24 +14,31 @@ var _game = null;
 var _square_size;
 
 var config = {
-    cell_margin            : 2,
-    score_margin           : 2,
-    board_margin           : 8,
-    color_canvas_bg        : "00e0e0",
-    color_board_bg         : "101830",
-    color_board_bg_margin  : "808080",
-    color_score_margin     : "202000",
-    color_score_bg         : "c0c040",
-    color_score_fg         : "000000",
-    color_game_over_fg     : "ffffff",
-    color_game_over_fg2    : "000000",
-    color_tile_I           : "866122",
-    color_tile_L           : "F00034",
-    color_tile_Q           : "34CB33",
-    color_tile_R           : "A129D6",
-    color_tile_S           : "F1EC5F",
-    color_tile_T           : "FB5B04",
-    color_tile_Z           : "4693B8",
+    cell_margin                 : 2,
+    score_margin                : 2,
+    board_margin                : 8,
+    square_gap                  : 1,
+    score_fracof_board          : .75,
+    score_height_fracof_board   : .12,
+    score_y_fracof_height       : .12,
+    score_y_fracof_height       : .75,
+    board_space_fracof_score_height : .20,
+
+    color_canvas_bg             : "00e0e0",
+    color_board_bg              : "101830",
+    color_board_bg_margin       : "808080",
+    color_score_margin          : "202000",
+    color_score_bg              : "c0c040",
+    color_score_fg              : "000000",
+    color_game_over_fg          : "ffffff",
+    color_game_over_fg2         : "000000",
+    color_tile_I                : "866122",
+    color_tile_L                : "F00034",
+    color_tile_Q                : "34CB33",
+    color_tile_R                : "A129D6",
+    color_tile_S                : "F1EC5F",
+    color_tile_T                : "FB5B04",
+    color_tile_Z                : "4693B8",
 };
 
 // --------------------------------------------------------------------
@@ -197,17 +204,12 @@ class Graphics {
 // --------------------------------------------------------------------
 class Tile {
     static num_squares = 4;
-    static max_width = 4;
-    static max_height = 2;
 
     constructor(xpos, ypos) {
         const num_tile_types = 7;
         const tile_type = randu(num_tile_types);
 
-        if (tile_type == 0) { // T
-            this.squares = [ [0,0], [1,0], [-1,0], [0,1] ];
-            this.color = config.color_tile_T;
-        } else if (tile_type == 1) { // I
+        if (tile_type == 1) { // I
             this.squares = [ [-1,0], [0,0], [1,0], [2,0] ];
             this.color = config.color_tile_I;
         } else if (tile_type == 2) { // L
@@ -225,8 +227,9 @@ class Tile {
         } else if (tile_type == 6) { // S
             this.squares = [ [0,0], [-1,0], [0,1], [1,1] ];
             this.color = config.color_tile_S;
-        } else {
-            ///print "invalid tile type ";tile_type; stop
+        } else { // T
+            this.squares = [ [0,0], [1,0], [-1,0], [0,1] ];
+            this.color = config.color_tile_T;
         }
         this.xpos = xpos;
         this.ypos = ypos;
@@ -239,7 +242,7 @@ class Tile {
     static draw_square(gfx, xoff, yoff, xpos, ypos, color) {
         const x = xoff + (xpos * _square_size);
         const y = yoff + (ypos * _square_size);
-        gfx.draw_rect(x, y, _square_size-1, _square_size-1, color);
+        gfx.draw_rect(x, y, _square_size-config.square_gap, _square_size-config.square_gap, color);
     }
     move(xincr, yincr) {
         this.xpos += xincr;
@@ -276,36 +279,36 @@ class Board {
     }
     fall_step(falling) {
         falling.move(0,1);
-        if (this.intersects(falling)) {
-            falling.move(0,-1);
-            this.splat(falling);
-            return false;
-        }
-        return true;
+        if (!this.intersects(falling))
+            return true;
+        falling.move(0,-1);
+        this.splat(falling);
+        return false;
     }
-    draw(gfx, cw, wh, dim) {
-        const cell_margin = config.cell_margin;
-        const board_width = (_square_size * this.width) + (2*config.board_margin);
-        const board_height = (_square_size * this.height) + (2*config.board_margin);
-        const score_width = board_width * .75;
-        const score_height = board_height * .12;
-        const score_y = score_height * .75;
-        const board_y = score_y + score_height*(1.2);
-        const score_x = (cw - score_width) / 2;
-        const board_x = (cw - board_width) / 2;
-
+    draw(gfx, cw, ch, dim) {
+        const lo = this.layout(cw, ch);
         gfx.clear(config.canvas_bg);
-        gfx.draw_outlined_rect(board_x, board_y, board_width, board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
+        gfx.draw_outlined_rect(lo.board_x, lo.board_y, lo.board_width, lo.board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let ypos = 0; ypos < this.height; ++ypos) {
             for (let xpos = 0; xpos < this.width; ++xpos) {
                 let color = this.cells[ypos][xpos];
                 if (color != null)
-                    Tile.draw_square(gfx, board_x + config.board_margin, board_y + config.board_margin, xpos, ypos, color.darker(dim));
+                    Tile.draw_square(gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, xpos, ypos, color.darker(dim));
             }
         }
-        return { 
-            board_x:board_x, board_y:board_y, board_width:board_width, board_height:board_height, 
-            score_x:score_x, score_y:score_y , score_width:score_width, score_height:score_height };
+        return lo;
+    }
+    layout(cw, ch) {
+        const lo = { cell_margin : config.cell_margin };
+        lo.board_width = (_square_size * this.width) + (2*config.board_margin);
+        lo.board_height = (_square_size * this.height) + (2*config.board_margin);
+        lo.score_width = lo.board_width * config.score_fracof_board;
+        lo.score_height = lo.board_height * config.score_height_fracof_board;
+        lo.score_y = lo.score_height * config.score_y_fracof_height;
+        lo.board_y = lo.score_y + lo.score_height * (1 + config.board_space_fracof_score_height);
+        lo.score_x = (cw - lo.score_width) / 2;
+        lo.board_x = (cw - lo.board_width) / 2;
+        return lo;
     }
     check_full_rows() {
         let full_rows = 0;
@@ -404,20 +407,20 @@ class Game {
     }
     draw(dur) {
         const dim = this.playing ? 1 : .45;
-        const d = this.board.draw(this.gfx, this.cw, this.ch, dim);
+        const lo = this.board.draw(this.gfx, this.cw, this.ch, dim);
 
         if (this.falling != null)
-            this.falling.draw(this.gfx, d.board_x + config.board_margin, d.board_y + config.board_margin, dim);
+            this.falling.draw(this.gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, dim);
 
         const score_str = this.score_.toString();
-        this.gfx.draw_outlined_rect(d.score_x, d.score_y, d.score_width, d.score_height, config.score_margin, config.score_margin, config.color_score_bg, config.color_score_margin);
-        this.gfx.draw_just_text(d.score_x + config.score_margin, d.score_y + config.score_margin, d.score_width*0.9, score_str, +1, config.color_score_fg);
+        this.gfx.draw_outlined_rect(lo.score_x, lo.score_y, lo.score_width, lo.score_height, config.score_margin, config.score_margin, config.color_score_bg, config.color_score_margin);
+        this.gfx.draw_just_text(lo.score_x + config.score_margin, lo.score_y + config.score_margin, lo.score_width*0.9, score_str, +1, config.color_score_fg);
 
-        const msg_y = d.board_y + config.board_margin*2;
+        const msg_y = lo.board_y + config.board_margin*2;
         if (this.game_over)
-            this.gfx.draw_just_text(d.board_x, msg_y, d.board_width, "Game over", 0, config.color_game_over_fg, config.color_game_over_fg2);
+            this.gfx.draw_just_text(lo.board_x, msg_y, lo.board_width, "Game over", 0, config.color_game_over_fg, config.color_game_over_fg2);
         else if (!this.playing)
-            this.gfx.draw_just_text(d.board_x, msg_y, d.board_width, "PAUSED", 0, config.color_game_over_fg, config.color_game_over_fg2);
+            this.gfx.draw_just_text(lo.board_x, msg_y, lo.board_width, "PAUSED", 0, config.color_game_over_fg, config.color_game_over_fg2);
     }
     drop(gfx) {
         if (this.falling == null) return;
