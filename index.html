@@ -16,8 +16,8 @@ var _square_size;
 var config = {
     board_margin                : 8,
     cell_margin                 : 2,
-    explode_phase1              : 400,
-    explode_phase2              : 600,
+    explode_phase1              : 700,
+    explode_phase2              : 100,
     explosion_speedup           : .9,
     min_step_dur                : 350,
     score_margin                : 2,
@@ -32,7 +32,8 @@ var config = {
     color_canvas_bg             : "00e0e0",
     color_board_bg              : "101830",
     color_board_bg_margin       : "808080",
-    color_score_margin          : "202000",
+    color_explosion1            : "ffffff",
+    color_explosion2            : "101830",
     color_score_bg              : "c0c040",
     color_score_fg              : "000000",
     color_game_over_fg          : "ffffff",
@@ -54,6 +55,20 @@ class Color {
     }
     hex() {
         return this.hex_str;
+    }
+    fade(color2, frac) {
+        if (frac <= 0) return this;
+        if (frac >= 1) return color2;
+        const r1 = this.get_comp(0);
+        const g1 = this.get_comp(1);
+        const b1 = this.get_comp(2);
+        const r2 = color2.get_comp(0);
+        const g2 = color2.get_comp(1);
+        const b2 = color2.get_comp(2);
+        const r = r1 + Math.floor((r2 - r1) * frac);
+        const g = g1 + Math.floor((g2 - g1) * frac);
+        const b = b1 + Math.floor((b2 - b1) * frac);
+        return new Color(hex2(r) + hex2(g) + hex2(b));
     }
     jstring() {
         return "#" + this.hex_str;
@@ -312,18 +327,25 @@ class Board {
         gfx.draw_outlined_rect(lo.board_x, lo.board_y, lo.board_width, lo.board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let ypos = 0; ypos < this.height; ++ypos) {
             for (let xpos = 0; xpos < this.width; ++xpos) {
-                let color = this.color(xpos,ypos);
+                let color = this.square_color(xpos,ypos);
                 if (color != null)
                     Tile.draw_square(gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, xpos, ypos, color.darker(dim));
             }
         }
         return lo;
     }
-    color(xpos, ypos) {
+    square_color(xpos, ypos) {
         let color = this.cells[ypos][xpos];
         for (const y of this.exploding) {
             if (y == ypos) {
-                return config.color_white;
+                const edur = now() - this.explode_start;
+                if (edur < config.explode_phase1) { // fade color->white
+                    const frac = edur / config.explode_phase1;
+                    return color.fade(config.color_explosion1, frac);
+                } else { // fade white->black
+                    const frac = (edur - config.explode_phase1) / config.explode_phase2;
+                    return config.color_explosion1.fade(config.color_explosion2, frac);
+                }
             }
         }
         return color;
