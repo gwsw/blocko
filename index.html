@@ -86,11 +86,13 @@ class Graphics {
         this.font_height = font_size;
     }
     clear(color) {
+        const dims = this.canvas_dims();
+        this.ctx.clearRect(0, 0, dims.w, dims.h);
+        this.draw_rect(0, 0, dims.w, dims.h, color);
+    }
+    canvas_dims() {
         const canvas = this.ctx.canvas;
-        const w = canvas.width;
-        const h = canvas.height;
-        this.ctx.clearRect(0, 0, w, h);
-        this.draw_rect(0, 0, w, h, color);
+        return { w : canvas.width, h : canvas.height };
     }
     draw_rect(x, y, w, h, color) {
         if (color != undefined && color != null)
@@ -112,12 +114,6 @@ class Graphics {
     draw_outlined_rect(x, y, w, h, xb, yb, bg_color, border_color) {
         this.draw_rect(x+xb, y+yb, w-2*xb, h-2*yb, bg_color);
         this.draw_outline(x, y, w, h, xb, yb, border_color);
-    }
-    draw_circle(x, y, r, color) {
-        this.ctx.beginPath();
-        this.ctx.fillStyle = color.jstring();
-        this.ctx.arc(x, y, r, 0, 2*Math.PI);
-        this.ctx.fill();
     }
     draw_text(x, y, text, color) {
         this.ctx.fillStyle = color.jstring();
@@ -148,24 +144,15 @@ class Graphics {
         this.draw_text(x, y, text, color);
         return text_size;
     }
-    static end_word(text, p) {
-        for (; p < text.length; ++p) {
-            if (text.substr(p,1) != " ") break;
-        }
-        for (; p < text.length; ++p) {
-            if (text.substr(p,1) == " " || text.substr(p,1) == "\n") break;
-        }
-        return p;
-    }
 }; // class Graphics
 
 // --------------------------------------------------------------------
 class Tile {
     static num_squares = 4;
+    static num_tile_types = 7;
 
     constructor(xpos, ypos) {
-        const num_tile_types = 7;
-        const tile_type = randu(num_tile_types);
+        const tile_type = randu(Tile.num_tile_types);
         this.init_type(tile_type);
         this.xpos = xpos;
         this.ypos = ypos;
@@ -257,15 +244,16 @@ class Board {
         this.num_explosions += this.start_explode();
         return false; // delete the tile
     }
-    draw(gfx, cw, ch, dim) {
-        const lo = this.layout(cw, ch);
+    draw(gfx, dark) {
+        const dims = gfx.canvas_dims();
+        const lo = this.layout(dims.w, dims.h);
         gfx.clear(config.canvas_bg);
         gfx.draw_outlined_rect(lo.board_x, lo.board_y, lo.board_width, lo.board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let ypos = 0; ypos < this.height; ++ypos) {
             for (let xpos = 0; xpos < this.width; ++xpos) {
                 let color = this.square_color(xpos,ypos);
                 if (color != null)
-                    Tile.draw_square(gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, xpos, ypos, color.darker(dim));
+                    Tile.draw_square(gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, xpos, ypos, color.darker(dark));
             }
         }
         return lo;
@@ -377,8 +365,6 @@ class Game {
         this.board = new Board(w, h);
     }
     canvas_size(w, h) {
-        this.cw = w;
-        this.ch = h;
         _square_size  = h * .03;
     }
     run() {
@@ -389,7 +375,7 @@ class Game {
                 this.game_step();
             }
         }
-        this.draw(this.gfx);
+        this.draw();
     }
     game_step() {
         const old_explosions = this.board.num_explosions;
@@ -408,12 +394,12 @@ class Game {
                 this.step_dur = config.min_step_dur;
         }
     }
-    draw(dur) {
-        const dim = this.playing ? 1 : .45;
-        const lo = this.board.draw(this.gfx, this.cw, this.ch, dim);
+    draw() {
+        const dark = this.playing ? 1 : .45;
+        const lo = this.board.draw(this.gfx, dark);
 
         if (this.falling != null)
-            this.falling.draw(this.gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, dim);
+            this.falling.draw(this.gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, dark);
 
         const score_str = this.score_.toString();
         this.gfx.draw_outlined_rect(lo.score_x, lo.score_y, lo.score_width, lo.score_height, config.score_margin, config.score_margin, config.color_score_bg, config.color_score_margin);
