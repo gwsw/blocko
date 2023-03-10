@@ -14,15 +14,18 @@ var _game = null;
 var _square_size;
 
 var config = {
-    cell_margin                 : 2,
-    score_margin                : 2,
     board_margin                : 8,
+    cell_margin                 : 2,
+    explode_phase1              : 600,
+    explode_phase2              : 600,
+    score_margin                : 2,
     square_gap                  : 1,
+
+    board_space_fracof_score_height : .20,
     score_fracof_board          : .75,
     score_height_fracof_board   : .12,
     score_y_fracof_height       : .12,
     score_y_fracof_height       : .75,
-    board_space_fracof_score_height : .20,
 
     color_canvas_bg             : "00e0e0",
     color_board_bg              : "101830",
@@ -39,6 +42,7 @@ var config = {
     color_tile_S                : "F1EC5F",
     color_tile_T                : "FB5B04",
     color_tile_Z                : "4693B8",
+    color_white                 : "ffffff",
 };
 
 // --------------------------------------------------------------------
@@ -263,6 +267,7 @@ class Board {
         this.width = w;
         this.height = h;
         this.cells = [];
+        this.exploding = [];
         for (let ypos = 0; ypos < h; ++ypos) {
             this.cells.push([]);
             for (let xpos = 0; xpos < w; ++xpos) {
@@ -278,12 +283,20 @@ class Board {
         }
     }
     fall_step(falling) {
-        falling.move(0,1);
+        if (this.exploding.length > 0) {
+            if (now() < this.explode_start + config.explode_phase1 + config.explode_phase2)
+                // Doing explode animation; don't do normal step.
+                return false;
+            // Was doing explode animation; now it's finished.
+            this.end_explode();
+        }
+        falling.move(0,+1); // move down one square
         if (!this.intersects(falling))
             return true;
-        falling.move(0,-1);
-        this.splat(falling);
-        return false;
+        // Falling tile hit the terrain.
+        falling.move(0,-1); // revert move
+        this.splat(falling); // merge into terrain
+        return false; // delete the tile
     }
     draw(gfx, cw, ch, dim) {
         const lo = this.layout(cw, ch);
@@ -291,12 +304,21 @@ class Board {
         gfx.draw_outlined_rect(lo.board_x, lo.board_y, lo.board_width, lo.board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let ypos = 0; ypos < this.height; ++ypos) {
             for (let xpos = 0; xpos < this.width; ++xpos) {
-                let color = this.cells[ypos][xpos];
+                let color = this.color(xpos,ypos);
                 if (color != null)
                     Tile.draw_square(gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, xpos, ypos, color.darker(dim));
             }
         }
         return lo;
+    }
+    color(xpos, ypos) {
+        let color = this.cells[ypos][xpos];
+        for (const y of this.exploding) {
+            if (y == ypos) {
+                return config.color_white;
+            }
+        }
+        return color;
     }
     layout(cw, ch) {
         const lo = { cell_margin : config.cell_margin };
@@ -310,36 +332,45 @@ class Board {
         lo.board_x = (cw - lo.board_width) / 2;
         return lo;
     }
-    check_full_rows() {
-        let full_rows = 0;
-        let full_row = [];
+    start_explode() {
+        const time = now();
         for (let ypos = 0; ypos < this.height; ++ypos) {
-            full_row.push(true); // full_row[ypos] = true;
-            for (let xpos = 0; xpos < this.width; ++xpos) {
-                if (this.cells[ypos][xpos] == null) {
-                    full_row[ypos] = false;
-                    break;
-                }
+            if (this.full_row(ypos)) {
+                this.exploding.push(ypos);
+                this.explode_start = time;
             }
-            if (full_row[ypos]) ++full_rows;
         }
-        if (full_rows > 0) {
-            let dst_y = this.height-1;
-            for (let src_y = dst_y; src_y >= 0; --src_y) {
-                if (!full_row[src_y]) {
-                    for (let xpos = 0; xpos < this.width; ++xpos)
-                        this.cells[dst_y][xpos] = this.cells[src_y][xpos];
-                    --dst_y;
-                }
-            }
-            while (dst_y > 0) {
-                for (let xpos = 0; xpos < this.width; ++xpos) {
-                    this.cells[dst_y][xpos] = null;
-                }
+        return this.exploding.length;
+    }
+    end_explode() {
+        let dst_y = this.height-1;
+        for (let src_y = dst_y; src_y >= 0; --src_y) {
+            if (!this.exploded(src_y)) {
+                for (let xpos = 0; xpos < this.width; ++xpos)
+                    this.cells[dst_y][xpos] = this.cells[src_y][xpos];
                 --dst_y;
             }
         }
-        return full_rows;
+        while (dst_y > 0) {
+            for (let xpos = 0; xpos < this.width; ++xpos) {
+                this.cells[dst_y][xpos] = null;
+            }
+            --dst_y;
+        }
+        this.exploding = [];
+    }
+    full_row(ypos) {
+        for (let xpos = 0; xpos < this.width; ++xpos) {
+            if (this.cells[ypos][xpos] == null)
+                return false;
+        }
+        return true;
+    }
+    exploded(ypos) {
+        for (const y of this.exploding)
+            if (y == ypos)
+                return true;
+        return false;
     }
     intersects(tile) {
         for (let i = 0; i < Tile.num_squares; ++i) {
@@ -391,18 +422,22 @@ class Game {
         }
         this.draw(this.gfx);
         if (this.explosions() > old_explosions) {
-            step_dur = (.9 * step_dur);
-            if (step_dur < 110) step_dur = 110;
+            this.step_dur = (.9 * this.step_dur);
+            if (this.step_dur < 110) this.step_dur = 110;
         }
     }
     game_step() {
         if (this.falling == null) {
-            this.falling = new Tile(this.board.width/2, 1);
-            if (this.board.intersects(this.falling))
+            this.falling = new Tile(this.board.width/2, 1); // create on second line
+            if (this.board.intersects(this.falling)) // crashed as soon as created
                 this.game_is_over();
         } else if (!this.board.fall_step(this.falling)) {
             this.falling = null;
-            this.check_full_rows();
+            const erows = this.board.start_explode();
+            if (erows > 0) {
+                ++this.num_explosions;
+                this.add_score(5 * erows * erows);
+            }
         }
     }
     draw(dur) {
@@ -444,18 +479,11 @@ class Game {
     explosions() {
         return this.num_explosions;
     }
-    check_full_rows() {
-        const full_rows = this.board.check_full_rows();
-        if (full_rows > 0) {
-            ++this.num_explosions;
-            this.add_score(4 * full_rows*full_rows);
-        }
-    }
     score() {
         return this.score_;
     }
     add_score(incr) {
-        const score_bloat = 25;
+        const score_bloat = 1; // 25
         this.score_ += incr * score_bloat;
     }
     static _event_keydown(e) {
