@@ -16,8 +16,10 @@ var _square_size;
 var config = {
     board_margin                : 8,
     cell_margin                 : 2,
-    explode_phase1              : 600,
+    explode_phase1              : 400,
     explode_phase2              : 600,
+    explosion_speedup           : .9,
+    min_step_dur                : 350,
     score_margin                : 2,
     square_gap                  : 1,
 
@@ -268,6 +270,7 @@ class Board {
         this.height = h;
         this.cells = [];
         this.exploding = [];
+        this.num_explosions = 0;
         for (let ypos = 0; ypos < h; ++ypos) {
             this.cells.push([]);
             for (let xpos = 0; xpos < w; ++xpos) {
@@ -283,12 +286,12 @@ class Board {
         }
     }
     fall_step(falling) {
-        if (this.exploding.length > 0) {
-            if (now() < this.explode_start + config.explode_phase1 + config.explode_phase2)
-                // Doing explode animation; don't do normal step.
-                return false;
-            // Was doing explode animation; now it's finished.
-            this.end_explode();
+        if (this.is_exploding()) {
+            if (now() > this.explode_start + config.explode_phase1 + config.explode_phase2) {
+                // Was doing explode animation; now it's finished.
+                this.end_explode();
+            }
+            return true;
         }
         falling.move(0,+1); // move down one square
         if (!this.intersects(falling))
@@ -296,6 +299,11 @@ class Board {
         // Falling tile hit the terrain.
         falling.move(0,-1); // revert move
         this.splat(falling); // merge into terrain
+        const erows = this.start_explode();
+        if (erows > 0) {
+            ++this.num_explosions;
+            ///this.add_score(5 * erows * erows);
+        }
         return false; // delete the tile
     }
     draw(gfx, cw, ch, dim) {
@@ -340,6 +348,7 @@ class Board {
                 this.explode_start = time;
             }
         }
+        ++this.num_explosions;
         return this.exploding.length;
     }
     end_explode() {
@@ -389,6 +398,9 @@ class Board {
             this.cells[ypos][xpos] = tile.color;
         }
     }
+    is_exploding() {
+        return this.exploding.length > 0;
+    }
 }; // class Board
 
 // --------------------------------------------------------------------
@@ -397,11 +409,10 @@ class Game {
         this.gfx = gfx;
         const canvas = gfx.ctx.canvas;
         this.canvas_size(canvas.width, canvas.height);
-        this.num_explosions = 0;
         this.score_ = 0;
         this.falling = null;
         this.step_dur = 1000;
-        this.last_step = 0;
+        this.last_step = now();
         this.playing = true;
         this.game_over = false;
         this.board = new Board(w, h);
@@ -412,33 +423,30 @@ class Game {
         _square_size  = h * .03;
     }
     run() {
-        const old_explosions = this.explosions();
         if (this.playing) {
             const time = now();
             if (time >= this.last_step + this.step_dur) {
-                this.game_step();
                 this.last_step = time;
+                if (this.game_step()) {
+                    // Explosion started.
+                    this.step_dur = (config.explosion_speedup * this.step_dur);
+                    if (this.step_dur < config.min_step_dur)
+                        this.step_dur = config.min_step_dur;
+                }
             }
         }
         this.draw(this.gfx);
-        if (this.explosions() > old_explosions) {
-            this.step_dur = (.9 * this.step_dur);
-            if (this.step_dur < 110) this.step_dur = 110;
-        }
     }
     game_step() {
-        if (this.falling == null) {
+        let changes = false;
+        if (this.falling == null && !this.board.is_exploding()) {
             this.falling = new Tile(this.board.width/2, 1); // create on second line
             if (this.board.intersects(this.falling)) // crashed as soon as created
                 this.game_is_over();
         } else if (!this.board.fall_step(this.falling)) {
             this.falling = null;
-            const erows = this.board.start_explode();
-            if (erows > 0) {
-                ++this.num_explosions;
-                this.add_score(5 * erows * erows);
-            }
         }
+        return changes;
     }
     draw(dur) {
         const dim = this.playing ? 1 : .45;
@@ -475,9 +483,6 @@ class Game {
         this.falling.rotate(1);
         if (this.board.intersects(this.falling))
             this.falling.rotate(-1);
-    }
-    explosions() {
-        return this.num_explosions;
     }
     score() {
         return this.score_;
