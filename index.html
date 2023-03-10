@@ -16,18 +16,25 @@ var _square_size;
 var config = {
     board_margin                : 8,
     cell_margin                 : 2,
+    dark                        : .45,
     explode_phase1              : 700,
     explode_phase2              : 100,
     explosion_speedup           : .9,
     min_step_dur                : 350,
+    score_bloat                 : 1,
+    score_drop                  : 1,
+    score_explosion             : 5,
     score_margin                : 2,
+    shadow_shift                : 2,
     square_gap                  : 1,
+    step_dur                    : 1000,
 
     board_space_fracof_score_height : .20,
     score_fracof_board          : .75,
     score_height_fracof_board   : .12,
     score_y_fracof_height       : .12,
     score_y_fracof_height       : .75,
+    square_fracof_canvas_height : .03,
 
     color_canvas_bg             : "00e0e0",
     color_board_bg              : "002418",
@@ -140,7 +147,7 @@ class Graphics {
         else if (just > 0)
             nx = x + w - text_size.width;
         if (nx > x) x = nx;
-        if (color_shadow != null) this.draw_text(x+2, y+2, text, color_shadow);
+        if (color_shadow != null) this.draw_text(x+config.shadow_shift, y+config.shadow_shift, text, color_shadow);
         this.draw_text(x, y, text, color);
         return text_size;
     }
@@ -358,21 +365,21 @@ class Game {
         this.canvas_size(canvas.width, canvas.height);
         this.score_ = 0;
         this.falling = null;
-        this.step_dur = 1000;
+        this.step_dur = config.step_dur;
         this.last_step = now();
         this.playing = true;
         this.game_over = false;
         this.board = new Board(w, h);
     }
     canvas_size(w, h) {
-        _square_size  = h * .03;
+        _square_size  = h * config.square_fracof_canvas_height;
     }
     run() {
         if (this.playing) {
             const time = now();
             if (time >= this.last_step + this.step_dur) {
-                this.last_step = time;
                 this.game_step();
+                this.last_step = time;
             }
         }
         this.draw();
@@ -387,7 +394,7 @@ class Game {
             this.falling = null;
         }
         const new_explosions = this.board.num_explosions - old_explosions;
-        this.add_score(5 * new_explosions * new_explosions);
+        this.add_score(config.score_explosion * new_explosions * new_explosions);
         if (new_explosions) {
             this.step_dur = (config.explosion_speedup * this.step_dur);
             if (this.step_dur < config.min_step_dur)
@@ -395,7 +402,7 @@ class Game {
         }
     }
     draw() {
-        const dark = this.playing ? 1 : .45;
+        const dark = this.playing ? 1 : config.dark;
         const lo = this.board.draw(this.gfx, dark);
 
         if (this.falling != null)
@@ -416,7 +423,7 @@ class Game {
         while (this.falling != null) {
             this.game_step();
         }
-        this.add_score(1);
+        this.add_score(config.score_drop);
     }
     move_horz(dir) {
         if (this.falling == null) return;
@@ -434,8 +441,7 @@ class Game {
         return this.score_;
     }
     add_score(incr) {
-        const score_bloat = 1; // 25
-        this.score_ += incr * score_bloat;
+        this.score_ += incr * config.score_bloat;
     }
     static _event_keydown(e) {
         if (_game != null) _game.event_keystroke(e.key, true);
@@ -459,7 +465,10 @@ class Game {
             if (this.playing) this.rotate_falling();
             break;
         case 'ArrowUp':
-            this.playing = !this.playing;
+            if (!this.game_over) {
+                this.playing = !this.playing;
+                if (this.playing) window.requestAnimationFrame(run_game);
+            }
             break;
         case 'I': case 'i':
             if (this.falling != null) this.falling.change_type(1);
@@ -480,6 +489,7 @@ class Game {
             if (this.falling != null) this.falling.change_type(6);
             break;
         case 'T': case 't':
+                this.last_step = time;
             if (this.falling != null) this.falling.change_type(7);
             break;
         }
@@ -498,8 +508,10 @@ function now() {
 }
 
 function run_game() {
-    if (_game != null) _game.run();
-    window.requestAnimationFrame(run_game);
+    if (_game != null) {
+        _game.run();
+        if (_game.playing) window.requestAnimationFrame(run_game);
+    }
 }
 
 function munge_config() {
