@@ -30,7 +30,7 @@ var config = {
     score_y_fracof_height       : .75,
 
     color_canvas_bg             : "00e0e0",
-    color_board_bg              : "101830",
+    color_board_bg              : "002418",
     color_board_bg_margin       : "808080",
     color_explosion1            : "ffffff",
     color_explosion2            : "101830",
@@ -229,7 +229,11 @@ class Tile {
     constructor(xpos, ypos) {
         const num_tile_types = 7;
         const tile_type = randu(num_tile_types);
-
+        this.init_type(tile_type);
+        this.xpos = xpos;
+        this.ypos = ypos;
+    }
+    init_type(tile_type) {
         if (tile_type == 1) { // I
             this.squares = [ [-1,0], [0,0], [1,0], [2,0] ];
             this.color = config.color_tile_I;
@@ -252,8 +256,9 @@ class Tile {
             this.squares = [ [0,0], [1,0], [-1,0], [0,1] ];
             this.color = config.color_tile_T;
         }
-        this.xpos = xpos;
-        this.ypos = ypos;
+    }
+    change_type(tile_type) {
+        this.init_type(tile_type);
     }
     draw(gfx, xoff, yoff, dark = 1) {
         let color = this.color.darker(dark);
@@ -303,7 +308,7 @@ class Board {
     fall_step(falling) {
         if (this.is_exploding()) {
             if (now() > this.explode_start + config.explode_phase1 + config.explode_phase2) {
-                // Was doing explode animation; now it's finished.
+                // Explode animation is finished.
                 this.end_explode();
             }
             return true;
@@ -314,11 +319,7 @@ class Board {
         // Falling tile hit the terrain.
         falling.move(0,-1); // revert move
         this.splat(falling); // merge into terrain
-        const erows = this.start_explode();
-        if (erows > 0) {
-            ++this.num_explosions;
-            ///this.add_score(5 * erows * erows);
-        }
+        this.num_explosions += this.start_explode();
         return false; // delete the tile
     }
     draw(gfx, cw, ch, dim) {
@@ -336,6 +337,7 @@ class Board {
     }
     square_color(xpos, ypos) {
         let color = this.cells[ypos][xpos];
+        if (color == null) return null;
         for (const y of this.exploding) {
             if (y == ypos) {
                 const edur = now() - this.explode_start;
@@ -449,18 +451,13 @@ class Game {
             const time = now();
             if (time >= this.last_step + this.step_dur) {
                 this.last_step = time;
-                if (this.game_step()) {
-                    // Explosion started.
-                    this.step_dur = (config.explosion_speedup * this.step_dur);
-                    if (this.step_dur < config.min_step_dur)
-                        this.step_dur = config.min_step_dur;
-                }
+                this.game_step();
             }
         }
         this.draw(this.gfx);
     }
     game_step() {
-        let changes = false;
+        const old_explosions = this.board.num_explosions;
         if (this.falling == null && !this.board.is_exploding()) {
             this.falling = new Tile(this.board.width/2, 1); // create on second line
             if (this.board.intersects(this.falling)) // crashed as soon as created
@@ -468,7 +465,13 @@ class Game {
         } else if (!this.board.fall_step(this.falling)) {
             this.falling = null;
         }
-        return changes;
+        const new_explosions = this.board.num_explosions - old_explosions;
+        this.add_score(5 * new_explosions * new_explosions);
+        if (new_explosions) {
+            this.step_dur = (config.explosion_speedup * this.step_dur);
+            if (this.step_dur < config.min_step_dur)
+                this.step_dur = config.min_step_dur;
+        }
     }
     draw(dur) {
         const dim = this.playing ? 1 : .45;
@@ -536,6 +539,27 @@ class Game {
             break;
         case 'ArrowUp':
             this.playing = !this.playing;
+            break;
+        case 'I': case 'i':
+            if (this.falling != null) this.falling.change_type(1);
+            break;
+        case 'L': case 'l':
+            if (this.falling != null) this.falling.change_type(2);
+            break;
+        case 'R': case 'r':
+            if (this.falling != null) this.falling.change_type(3);
+            break;
+        case 'Q': case 'q':
+            if (this.falling != null) this.falling.change_type(4);
+            break;
+        case 'Z': case 'z':
+            if (this.falling != null) this.falling.change_type(5);
+            break;
+        case 'S': case 's':
+            if (this.falling != null) this.falling.change_type(6);
+            break;
+        case 'T': case 't':
+            if (this.falling != null) this.falling.change_type(7);
             break;
         }
     }
