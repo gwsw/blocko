@@ -20,7 +20,7 @@ var config = {
     explode_phase1              : 700,
     explode_phase2              : 100,
     explosion_speedup           : .9,
-    min_step_dur                : 350,
+    min_step_dur                : 150,
     score_bloat                 : 1,
     score_drop                  : 1,
     score_explosion             : 5,
@@ -36,12 +36,13 @@ var config = {
     score_y_fracof_height       : .75,
     square_fracof_canvas_height : .03,
 
-    color_canvas_bg             : "00e0e0",
+    color_canvas_bg             : "107070",
     color_board_bg              : "002418",
     color_board_bg_margin       : "808080",
     color_explosion1            : "ffffff",
     color_explosion2            : "101830",
     color_score_bg              : "c0c040",
+    color_score_margin          : "404008",
     color_score_fg              : "000000",
     color_game_over_fg          : "ffffff",
     color_game_over_fg2         : "000000",
@@ -254,7 +255,7 @@ class Board {
     draw(gfx, dark) {
         const dims = gfx.canvas_dims();
         const lo = this.layout(dims.w, dims.h);
-        gfx.clear(config.canvas_bg);
+        gfx.clear(config.color_canvas_bg);
         gfx.draw_outlined_rect(lo.board_x, lo.board_y, lo.board_width, lo.board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
         for (let ypos = 0; ypos < this.height; ++ypos) {
             for (let xpos = 0; xpos < this.width; ++xpos) {
@@ -302,7 +303,6 @@ class Board {
                 this.explode_start = time;
             }
         }
-        ++this.num_explosions;
         return this.exploding.length;
     }
     end_explode() {
@@ -489,7 +489,6 @@ class Game {
             if (this.falling != null) this.falling.change_type(6);
             break;
         case 'T': case 't':
-                this.last_step = time;
             if (this.falling != null) this.falling.change_type(7);
             break;
         }
