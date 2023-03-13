@@ -218,8 +218,8 @@ class Tile {
 // --------------------------------------------------------------------
 class Board {
     constructor(w, h) {
-        this.width = w;
-        this.height = h;
+        this.w = w;
+        this.h = h;
         this.cells = [];
         this.exploding = [];
         this.num_explosions = 0;
@@ -231,8 +231,8 @@ class Board {
         }
     }
     clear_cells() {
-        for (let ypos = 0; ypos < this.height; ++ypos) {
-            for (let xpos = 0; xpos < this.width; ++xpos) {
+        for (let ypos = 0; ypos < this.h; ++ypos) {
+            for (let xpos = 0; xpos < this.w; ++xpos) {
                 this.cells[ypos][xpos] = null;
             }
         }
@@ -257,8 +257,8 @@ class Board {
         const lo = this.layout(dims.w, dims.h);
         gfx.clear(config.color_canvas_bg);
         gfx.draw_outlined_rect(lo.board_x, lo.board_y, lo.board_width, lo.board_height, config.board_margin, config.board_margin, config.color_board_bg, config.color_board_bg_margin);
-        for (let ypos = 0; ypos < this.height; ++ypos) {
-            for (let xpos = 0; xpos < this.width; ++xpos) {
+        for (let ypos = 0; ypos < this.h; ++ypos) {
+            for (let xpos = 0; xpos < this.w; ++xpos) {
                 let color = this.square_color(xpos,ypos);
                 if (color != null)
                     Tile.draw_square(gfx, lo.board_x + config.board_margin, lo.board_y + config.board_margin, xpos, ypos, color.darker(dark));
@@ -285,8 +285,8 @@ class Board {
     }
     layout(cw, ch) {
         const lo = { cell_margin : config.cell_margin };
-        lo.board_width = (_square_size * this.width) + (2*config.board_margin);
-        lo.board_height = (_square_size * this.height) + (2*config.board_margin);
+        lo.board_width = (_square_size * this.w) + (2*config.board_margin);
+        lo.board_height = (_square_size * this.h) + (2*config.board_margin);
         lo.score_width = lo.board_width * config.score_fracof_board;
         lo.score_height = lo.board_height * config.score_height_fracof_board;
         lo.score_y = lo.score_height * config.score_y_fracof_height;
@@ -297,7 +297,7 @@ class Board {
     }
     start_explode() {
         const time = now();
-        for (let ypos = 0; ypos < this.height; ++ypos) {
+        for (let ypos = 0; ypos < this.h; ++ypos) {
             if (this.full_row(ypos)) {
                 this.exploding.push(ypos);
                 this.explode_start = time;
@@ -306,16 +306,16 @@ class Board {
         return this.exploding.length;
     }
     end_explode() {
-        let dst_y = this.height-1;
+        let dst_y = this.h-1;
         for (let src_y = dst_y; src_y >= 0; --src_y) {
             if (!this.exploded(src_y)) {
-                for (let xpos = 0; xpos < this.width; ++xpos)
+                for (let xpos = 0; xpos < this.w; ++xpos)
                     this.cells[dst_y][xpos] = this.cells[src_y][xpos];
                 --dst_y;
             }
         }
         while (dst_y > 0) {
-            for (let xpos = 0; xpos < this.width; ++xpos) {
+            for (let xpos = 0; xpos < this.w; ++xpos) {
                 this.cells[dst_y][xpos] = null;
             }
             --dst_y;
@@ -323,7 +323,7 @@ class Board {
         this.exploding = [];
     }
     full_row(ypos) {
-        for (let xpos = 0; xpos < this.width; ++xpos) {
+        for (let xpos = 0; xpos < this.w; ++xpos) {
             if (this.cells[ypos][xpos] == null)
                 return false;
         }
@@ -339,8 +339,8 @@ class Board {
         for (let i = 0; i < Tile.num_squares; ++i) {
             const xpos = tile.xpos + tile.squares[i][0];
             const ypos = tile.ypos + tile.squares[i][1];
-            if (xpos < 0 || xpos >= this.width) return true;
-            if (ypos < 0 || ypos >= this.height) return true;
+            if (xpos < 0 || xpos >= this.w) return true;
+            if (ypos < 0 || ypos >= this.h) return true;
             if (this.cells[ypos][xpos] != null) return true;
         }
         return false;
@@ -387,7 +387,7 @@ class Game {
     game_step() {
         const old_explosions = this.board.num_explosions;
         if (this.falling == null && !this.board.is_exploding()) {
-            this.falling = new Tile(this.board.width/2, 1); // create on second line
+            this.falling = new Tile(this.board.w/2, 1); // create on second line
             if (this.board.intersects(this.falling)) // crashed as soon as created
                 this.game_is_over();
         } else if (!this.board.fall_step(this.falling)) {
@@ -548,9 +548,15 @@ function canvas_resize() {
 
 function main() {
     munge_config();
+    const params = new URLSearchParams(window.location.search);
+    const sw = params.get("w");
+    const sh = params.get("h");
+    const w = (sw == null) ? 10 : parseInt(sw);
+    const h = (sh == null) ? 20 : parseInt(sh);
+
     const canvas = canvas_resize();
-    const gfx = new Graphics(canvas.getContext("2d"), canvas.height*.040);
-    _game = new Game(gfx, 10, 20);
+    const gfx = new Graphics(canvas.getContext("2d"), canvas.height*.050);
+    _game = new Game(gfx, w, h);
     document.addEventListener('keyup', Game._event_keyup);
     document.addEventListener('keydown', Game._event_keydown);
     window.addEventListener('resize', canvas_resize, false);
