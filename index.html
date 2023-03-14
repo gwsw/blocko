@@ -266,6 +266,23 @@ class Board {
         }
         return lo;
     }
+    get_pos(gfx, x, y) {
+        const dims = gfx.canvas_dims();
+        const lo = this.layout(dims.w, dims.h);
+
+        const x0 = lo.board_x + config.board_margin;
+        const y0 = lo.board_y + config.board_margin;
+
+        if (x < x0) return null;
+        const xpos = Math.floor((x - x0) / _square_size);
+        if (xpos >= this.w) return null;
+
+        if (y < y0) return null;
+        const ypos = Math.floor((y - y0) / _square_size);
+        if (ypos >= this.h) return null;
+
+        return { xpos: xpos, ypos: ypos };
+    }
     square_color(xpos, ypos) {
         let color = this.cells[ypos][xpos];
         if (color == null) return null;
@@ -443,6 +460,11 @@ class Game {
     add_score(incr) {
         this.score_ += incr * config.score_bloat;
     }
+    game_is_over() {
+        this.falling = null;
+        this.playing = false;
+        this.game_over = true;
+    }
     static _event_keydown(e) {
         if (_game != null) _game.event_keystroke(e.key, true);
     }
@@ -493,10 +515,42 @@ class Game {
             break;
         }
     }
-    game_is_over() {
-        this.falling = null;
-        this.playing = false;
-        this.game_over = true;
+    static _event_mousedown(e) {
+        if (_game != null) _game.event_mouse(e.clientX, e.clientY, true);
+    }
+    event_mouse(x, y, down) {
+        const xsmudge = 3;
+        const ysmudge = 2;
+        if (this.falling == null) return;
+        if (true) {
+            const cr = document.getElementById("canvas").getBoundingClientRect();
+            x -= cr.left;
+            y -= cr.top;
+        }
+        const dims = this.gfx.canvas_dims();
+        const lo = this.board.layout(dims.w, dims.h);
+        if (y < lo.board_y && !this.game_over) {
+            this.playing = !this.playing;
+            if (this.playing) window.requestAnimationFrame(run_game);
+            return;
+        }
+        const mpos = this.board.get_pos(this.gfx, x, y);
+        if (mpos == null) return;
+        if (mpos.xpos + xsmudge >= this.falling.xpos && mpos.xpos < this.falling.xpos + xsmudge) {
+            if (mpos.ypos + ysmudge >= this.falling.ypos && mpos.ypos < this.falling.ypos + ysmudge) {
+                this.rotate_falling();
+                return;
+            } 
+            if (mpos.ypos + ysmudge >= this.board.h) {
+                this.drop();
+                return;
+            }
+        }
+        if (mpos.xpos < xsmudge) {
+            this.move_horz(-1);
+        } else if (mpos.xpos + xsmudge >= this.board.w) {
+            this.move_horz(+1);
+        }
     }
 }; // class Game
 
@@ -559,6 +613,7 @@ function main() {
     _game = new Game(gfx, w, h);
     document.addEventListener('keyup', Game._event_keyup);
     document.addEventListener('keydown', Game._event_keydown);
+    document.addEventListener('mousedown', Game._event_mousedown);
     window.addEventListener('resize', canvas_resize, false);
     run_game();
 }
