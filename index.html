@@ -390,6 +390,7 @@ class Game {
     }
     canvas_size(w, h) {
         _square_size  = h * config.square_fracof_canvas_height;
+        this.gfx = new Graphics(canvas.getContext("2d"), h*.050); ///yuck
     }
     run() {
         if (this.playing) {
